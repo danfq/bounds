@@ -21,11 +21,3 @@ check:
 # build and immediately run
 run *args:
     cargo run -- {{ args }}
-
-# bump version and tag a release
-release version:
-    @echo "Releasing version {{ version }}"
-    cargo set-version {{ version }}
-    git commit -am "chore: release v{{ version }}"
-    git tag v{{ version }}
-    git push --follow-tags

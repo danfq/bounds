@@ -1,0 +1,212 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Create release
+    runs-on: ubuntu-latest
+
+    outputs:
+      release-created: ${{ steps.release.outputs.created }}
+      tag-name: ${{ steps.release.outputs.tag }}
+      release-sha: ${{ steps.release.outputs.sha }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Bump version and create GitHub release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          LAST_TAG="$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)"
+          RANGE="HEAD"
+          if [[ -n "$LAST_TAG" ]]; then
+            RANGE="$LAST_TAG..HEAD"
+          fi
+
+          if ! git log --format='%s' "$RANGE" | grep -qE '^(feat|fix|deps|perf|refactor|docs|chore|build|ci|test|style)(\([^)]*\))?!?:'; then
+            echo "No conventional commits to release."
+            echo "created=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          BUMP="patch"
+          if git log --format='%B' "$RANGE" | grep -qE 'BREAKING[ -]CHANGE:' \
+            || git log --format='%s' "$RANGE" | grep -qE '^[a-z]+(\([^)]*\))?!:'; then
+            BUMP="major"
+          elif git log --format='%s' "$RANGE" | grep -qE '^feat(\([^)]*\))?:'; then
+            BUMP="minor"
+          fi
+
+          VERSION="$(sed -nE 's/^version = "([0-9]+\.[0-9]+\.[0-9]+)"$/\1/p' Cargo.toml | head -n 1)"
+          if [[ -z "$VERSION" ]]; then
+            echo "Cargo.toml package version must use stable major.minor.patch SemVer." >&2
+            exit 1
+          fi
+
+          IFS=. read -r MAJOR MINOR PATCH <<< "$VERSION"
+          case "$BUMP" in
+            major) VERSION="$((MAJOR + 1)).0.0" ;;
+            minor) VERSION="$MAJOR.$((MINOR + 1)).0" ;;
+            patch) VERSION="$MAJOR.$MINOR.$((PATCH + 1))" ;;
+          esac
+
+          sed -i -E \
+            "0,/^version = \"[0-9]+\.[0-9]+\.[0-9]+\"$/s//version = \"$VERSION\"/" \
+            Cargo.toml
+          cargo check
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.toml Cargo.lock
+          git commit -m "chore(release): v$VERSION [skip release]"
+          git push origin HEAD:main
+
+          RELEASE_SHA="$(git rev-parse HEAD)"
+          TAG_NAME="v$VERSION"
+          REPOSITORY_URL="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          NOTES_FILE="$(mktemp)"
+
+          printf '## Commits\n\n' > "$NOTES_FILE"
+          while IFS=$'\t' read -r SHA AUTHOR SUBJECT; do
+            SHORT_SHA="${SHA:0:7}"
+            LOGIN="$(gh api "/repos/$GITHUB_REPOSITORY/commits/$SHA" \
+              --jq '.author.login // empty' 2>/dev/null || true)"
+
+            if [[ -n "$LOGIN" ]]; then
+              LOGIN="${LOGIN,,}"
+              printf -- '- [`%s`](%s/commit/%s) %s by %s (@%s)\n' \
+                "$SHORT_SHA" "$REPOSITORY_URL" "$SHA" "$SUBJECT" "$AUTHOR" "$LOGIN" \
+                >> "$NOTES_FILE"
+            else
+              printf -- '- [`%s`](%s/commit/%s) %s by %s\n' \
+                "$SHORT_SHA" "$REPOSITORY_URL" "$SHA" "$SUBJECT" "$AUTHOR" \
+                >> "$NOTES_FILE"
+            fi
+          done < <(git log --format=$'%H\t%an\t%s' "$RANGE")
+
+          if [[ -n "$LAST_TAG" ]]; then
+            printf '\n**Full Changelog:** [`%s...%s`](%s/compare/%s...%s)\n' \
+              "$LAST_TAG" "$TAG_NAME" "$REPOSITORY_URL" "$LAST_TAG" "$TAG_NAME" \
+              >> "$NOTES_FILE"
+          fi
+
+          gh release create "$TAG_NAME" \
+            --target "$RELEASE_SHA" \
+            --title "$TAG_NAME" \
+            --notes-file "$NOTES_FILE"
+
+          echo "created=true" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG_NAME" >> "$GITHUB_OUTPUT"
+          echo "sha=$RELEASE_SHA" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build ${{ matrix.platform }}
+    needs: release
+    if: ${{ needs.release.outputs.release-created == 'true' }}
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            platform: linux-x64
+            runner: ubuntu-latest
+            extension: ""
+
+          - target: aarch64-unknown-linux-gnu
+            platform: linux-arm64
+            runner: ubuntu-latest
+            extension: ""
+
+          - target: x86_64-apple-darwin
+            platform: macos-x64
+            runner: macos-latest
+            extension: ""
+
+          - target: aarch64-apple-darwin
+            platform: macos-arm64
+            runner: macos-latest
+            extension: ""
+
+          - target: x86_64-pc-windows-msvc
+            platform: windows-x64
+            runner: windows-latest
+            extension: .exe
+
+          - target: aarch64-pc-windows-msvc
+            platform: windows-arm64
+            runner: windows-latest
+            extension: .exe
+
+    steps:
+      - name: Checkout release commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.release-sha }}
+
+      - name: Install Rust target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install Linux ARM64 linker
+        if: ${{ matrix.target == 'aarch64-unknown-linux-gnu' }}
+        run: sudo apt-get update && sudo apt-get install --yes gcc-aarch64-linux-gnu
+
+      - name: Build executable
+        shell: bash
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+          TARGET: ${{ matrix.target }}
+        run: cargo build --release --locked --target "$TARGET"
+
+      - name: Package executable
+        id: artifact
+        shell: bash
+        env:
+          EXTENSION: ${{ matrix.extension }}
+          PLATFORM: ${{ matrix.platform }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          PACKAGE_NAME="$(sed -nE 's/^name = "([^"]+)"$/\1/p' Cargo.toml | head -n 1)"
+          BINARY="${PACKAGE_NAME}-${PLATFORM}${EXTENSION}"
+          mkdir -p dist
+          cp "target/${TARGET}/release/${PACKAGE_NAME}${EXTENSION}" "dist/$BINARY"
+
+          if [[ "$PLATFORM" == windows-* ]]; then
+            ARCHIVE="${PACKAGE_NAME}-${PLATFORM}.zip"
+            (
+              cd dist
+              7z a "$ARCHIVE" "$BINARY"
+            )
+          else
+            ARCHIVE="${PACKAGE_NAME}-${PLATFORM}.tar.gz"
+            tar -C dist -czf "dist/$ARCHIVE" "$BINARY"
+          fi
+
+          echo "path=dist/$ARCHIVE" >> "$GITHUB_OUTPUT"
+
+      - name: Upload binary to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ needs.release.outputs.tag-name }}
+          ARTIFACT_PATH: ${{ steps.artifact.outputs.path }}
+        shell: bash
+        run: gh release upload "$TAG_NAME" "$ARTIFACT_PATH" --clobber
