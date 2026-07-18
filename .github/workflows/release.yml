@@ -39,17 +39,33 @@ jobs:
             RANGE="$LAST_TAG..HEAD"
           fi
 
-          if ! git log --format='%s' "$RANGE" | grep -qE '^(feat|fix|deps|perf|refactor|docs|chore|build|ci|test|style)(\([^)]*\))?!?:'; then
+          RELEASABLE_COMMITS="$(mktemp)"
+          while IFS=$'\t' read -r SHA AUTHOR SUBJECT; do
+            if [[ "$SUBJECT" == *"[skip release]"* ]]; then
+              continue
+            fi
+
+            printf '%s\t%s\t%s\n' "$SHA" "$AUTHOR" "$SUBJECT"
+          done < <(git log --format=$'%H\t%an\t%s' "$RANGE") > "$RELEASABLE_COMMITS"
+
+          SUBJECTS="$(cut -f3- "$RELEASABLE_COMMITS")"
+          if ! grep -qE '^(feat|fix|deps|perf|refactor|docs|chore|build|ci|test|style)(\([^)]*\))?!?:' <<< "$SUBJECTS"; then
             echo "No conventional commits to release."
             echo "created=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
+          BODIES="$(
+            while IFS=$'\t' read -r SHA _; do
+              git log -1 --format='%B' "$SHA"
+            done < "$RELEASABLE_COMMITS"
+          )"
+
           BUMP="patch"
-          if git log --format='%B' "$RANGE" | grep -qE 'BREAKING[ -]CHANGE:' \
-            || git log --format='%s' "$RANGE" | grep -qE '^[a-z]+(\([^)]*\))?!:'; then
+          if grep -qE 'BREAKING[ -]CHANGE:' <<< "$BODIES" \
+            || grep -qE '^[a-z]+(\([^)]*\))?!:' <<< "$SUBJECTS"; then
             BUMP="major"
-          elif git log --format='%s' "$RANGE" | grep -qE '^feat(\([^)]*\))?:'; then
+          elif grep -qE '^feat(\([^)]*\))?:' <<< "$SUBJECTS"; then
             BUMP="minor"
           fi
 
@@ -98,7 +114,7 @@ jobs:
                 "$SHORT_SHA" "$REPOSITORY_URL" "$SHA" "$SUBJECT" "$AUTHOR" \
                 >> "$NOTES_FILE"
             fi
-          done < <(git log --format=$'%H\t%an\t%s' "$RANGE")
+          done < "$RELEASABLE_COMMITS"
 
           if [[ -n "$LAST_TAG" ]]; then
             printf '\n**Full Changelog:** [`%s...%s`](%s/compare/%s...%s)\n' \
@@ -110,6 +126,17 @@ jobs:
             --target "$RELEASE_SHA" \
             --title "$TAG_NAME" \
             --notes-file "$NOTES_FILE"
+
+          sed -i -E \
+            "s/(tag:[[:space:]]+)\"v[0-9]+\.[0-9]+\.[0-9]+\"/\1\"$TAG_NAME\"/" \
+            Formula/bounds.rb
+          sed -i -E \
+            "s/(revision:[[:space:]]+)\"[0-9a-f]{40}\"/\1\"$RELEASE_SHA\"/" \
+            Formula/bounds.rb
+
+          git add Formula/bounds.rb
+          git commit -m "chore(homebrew): update formula to $TAG_NAME [skip release]"
+          git push origin HEAD:main
 
           echo "created=true" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG_NAME" >> "$GITHUB_OUTPUT"
