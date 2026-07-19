@@ -142,6 +142,12 @@ jobs:
           echo "tag=$TAG_NAME" >> "$GITHUB_OUTPUT"
           echo "sha=$RELEASE_SHA" >> "$GITHUB_OUTPUT"
 
+      - name: Publish crate to crates.io
+        if: ${{ steps.release.outputs.created == 'true' }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: cargo publish --locked
+
   build:
     name: Build ${{ matrix.platform }}
     needs: release
