@@ -20,3 +20,10 @@ Future releases are available through the usual Homebrew update flow:
 brew update
 brew upgrade danfq/bounds/bounds
 ```
+
+## Acknowledgements
+
+The `.gitignore` templates are provided by
+[Toptal's gitignore.io project](https://www.toptal.com/developers/gitignore)
+and compacted by `bounds` to contain only the selected ignore rules. Thanks to
+the project and its contributors for maintaining the template collection.

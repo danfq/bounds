@@ -47,12 +47,24 @@ pub fn write(config: &Config) -> Result<Option<PathBuf>> {
 }
 
 fn render(templates: &[GitignoreTemplate]) -> String {
+    let mut known_rules = HashSet::new();
     let mut output = String::new();
 
     for template in templates {
+        let additions = new_rules(&template.source, &mut known_rules);
+
+        if additions.is_empty() {
+            continue;
+        }
+
         output.push_str(&format!("# {}\n", template.name));
-        output.push_str(template.source.as_str().trim());
-        output.push_str("\n\n");
+
+        for line in additions {
+            output.push_str(line);
+            output.push('\n');
+        }
+
+        output.push('\n');
     }
 
     output
@@ -69,15 +81,7 @@ fn merge(existing: &str, templates: &[GitignoreTemplate]) -> String {
     let mut output = existing.trim_end().to_owned();
 
     for template in templates {
-        let additions = template
-            .source
-            .as_str()
-            .lines()
-            .map(str::trim)
-            .filter(|line| {
-                !line.is_empty() && !line.starts_with('#') && known_rules.insert((*line).to_owned())
-            })
-            .collect::<Vec<_>>();
+        let additions = new_rules(&template.source, &mut known_rules);
 
         if additions.is_empty() {
             continue;
@@ -106,6 +110,20 @@ fn merge(existing: &str, templates: &[GitignoreTemplate]) -> String {
     output
 }
 
+fn new_rules<'a>(source: &'a str, known_rules: &mut HashSet<String>) -> Vec<&'a str> {
+    source
+        .lines()
+        .map(str::trim_end)
+        .filter(|line| {
+            let trimmed = line.trim_start();
+
+            !trimmed.is_empty()
+                && !trimmed.starts_with('#')
+                && known_rules.insert((*line).to_owned())
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::{merge, render};
@@ -113,6 +131,7 @@ mod tests {
 
     fn template(name: &str, source: &str) -> GitignoreTemplate {
         GitignoreTemplate {
+            key: name.to_lowercase(),
             name: name.to_owned(),
             source: source.to_owned(),
         }
@@ -149,5 +168,28 @@ mod tests {
         let templates = [template("Rust", "target/\n")];
 
         assert_eq!(merge("", &templates), "# Rust\ntarget/\n");
+    }
+
+    #[test]
+    fn render_removes_comments_blank_lines_and_duplicate_rules() {
+        let templates = [
+            template(
+                "Astro",
+                "# Created by Toptal\n\n### Astro ###\ndist/\n.astro/\n",
+            ),
+            template("Node", "# dependencies\nnode_modules/\ndist/\n"),
+        ];
+
+        assert_eq!(
+            render(&templates),
+            "# Astro\ndist/\n.astro/\n\n# Node\nnode_modules/\n\n"
+        );
+    }
+
+    #[test]
+    fn render_preserves_escaped_hash_patterns() {
+        let templates = [template("Example", "# comment\n\\#file\n")];
+
+        assert_eq!(render(&templates), "# Example\n\\#file\n\n");
     }
 }

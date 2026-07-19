@@ -7,12 +7,13 @@ use anyhow::{Result, bail};
 use cliclack::{confirm, input, multiselect, note, select, spinner};
 
 use crate::core::{
-    api::github::GitHubClient,
+    api::{github::GitHubClient, gitignore::GitignoreClient},
     detect,
     model::{Config, GitignoreTemplate, LicenseSummary, LicenseTemplate, WriteMode},
 };
 
 pub fn run(path: Option<PathBuf>) -> Result<Option<Config>> {
+    let gitignore = GitignoreClient::new();
     let github = GitHubClient::new();
     let target = choose_target(path)?;
 
@@ -31,7 +32,7 @@ pub fn run(path: Option<PathBuf>) -> Result<Option<Config>> {
         .interact()?;
 
     let mut gitignores = if files.contains(&"gitignore") {
-        choose_gitignores(&github, &target)?
+        choose_gitignores(&gitignore, &target)?
     } else {
         Vec::new()
     };
@@ -92,22 +93,22 @@ fn choose_target(path: Option<PathBuf>) -> Result<PathBuf> {
     }
 }
 
-fn choose_gitignores(github: &GitHubClient, target: &Path) -> Result<Vec<GitignoreTemplate>> {
-    let names = loading(
+fn choose_gitignores(gitignore: &GitignoreClient, target: &Path) -> Result<Vec<GitignoreTemplate>> {
+    let templates = loading(
         "Fetching .gitignore templates...",
         "Templates fetched",
-        || github.gitignore_names(),
+        || gitignore.templates(),
     )?;
 
     let detected = detect::gitignore_templates(target)
         .into_iter()
-        .filter(|detected| names.iter().any(|name| name == detected))
+        .filter(|detected| templates.iter().any(|template| template.key == *detected))
         .map(str::to_owned)
         .collect::<Vec<_>>();
 
-    let items = names
+    let items = templates
         .iter()
-        .map(|name| (name.clone(), name.clone(), String::new()))
+        .map(|template| (template.key.clone(), template.name.clone(), String::new()))
         .collect::<Vec<_>>();
 
     let selected = multiselect("Which .gitignore templates should be included?")
@@ -117,11 +118,15 @@ fn choose_gitignores(github: &GitHubClient, target: &Path) -> Result<Vec<Gitigno
         .max_rows(12)
         .interact()?;
 
-    loading(
-        "Downloading selected templates...",
-        "Templates downloaded",
-        || github.gitignore_templates(&selected),
-    )
+    Ok(selected
+        .into_iter()
+        .filter_map(|key| {
+            templates
+                .iter()
+                .find(|template| template.key == key)
+                .cloned()
+        })
+        .collect())
 }
 
 fn choose_license(github: &GitHubClient) -> Result<LicenseTemplate> {

@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use serde::de::DeserializeOwned;
 use ureq::Agent;
 
-use crate::core::model::{GitignoreTemplate, LicenseSummary, LicenseTemplate};
+use crate::core::model::{LicenseSummary, LicenseTemplate};
 
 const API_URL: &str = "https://api.github.com";
 const API_VERSION: &str = "2026-03-10";
@@ -25,21 +25,6 @@ impl GitHubClient {
             agent: config.into(),
             token: env::var("GITHUB_TOKEN").ok(),
         }
-    }
-
-    pub fn gitignore_names(&self) -> Result<Vec<String>> {
-        self.get_json(&format!("{API_URL}/gitignore/templates"))
-    }
-
-    pub fn gitignore_template(&self, name: &str) -> Result<GitignoreTemplate> {
-        self.get_json(&format!("{API_URL}/gitignore/templates/{name}"))
-    }
-
-    pub fn gitignore_templates(&self, names: &[String]) -> Result<Vec<GitignoreTemplate>> {
-        names
-            .iter()
-            .map(|name| self.gitignore_template(name))
-            .collect()
     }
 
     pub fn licenses(&self) -> Result<Vec<LicenseSummary>> {

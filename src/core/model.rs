@@ -25,6 +25,7 @@ pub enum WriteMode {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct GitignoreTemplate {
+    pub key: String,
     pub name: String,
     pub source: String,
 }
