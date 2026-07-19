@@ -1,5 +1,5 @@
 [package]
-name = "bounds"
+name = "bounds-cli"
 version = "0.3.0"
 edition = "2024"
 description = "Add a .gitignore and LICENSE to a repository"
