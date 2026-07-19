@@ -10,7 +10,8 @@ RUN bun install --frozen-lockfile
 
 # Move source files
 COPY src ./src
-COPY tsconfig.json .
+COPY public ./public
+COPY astro.config.mjs tsconfig.json ./
 
 # Build project
 RUN bun run build
