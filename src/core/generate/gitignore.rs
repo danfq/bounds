@@ -71,14 +71,7 @@ fn render(templates: &[GitignoreTemplate]) -> String {
 }
 
 fn merge(existing: &str, templates: &[GitignoreTemplate]) -> String {
-    let mut known_rules = existing
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty() && !line.starts_with('#'))
-        .map(str::to_owned)
-        .collect::<HashSet<_>>();
-
-    let mut output = existing.trim_end().to_owned();
+    let (mut output, mut known_rules) = compact_existing(existing);
 
     for template in templates {
         let additions = new_rules(&template.source, &mut known_rules);
@@ -108,6 +101,26 @@ fn merge(existing: &str, templates: &[GitignoreTemplate]) -> String {
     }
 
     output
+}
+
+fn compact_existing(existing: &str) -> (String, HashSet<String>) {
+    let mut known_rules = HashSet::new();
+    let mut output = String::new();
+
+    for line in existing.trim_end().lines() {
+        let line = line.trim_end();
+        let trimmed = line.trim_start();
+
+        if !trimmed.is_empty() && !trimmed.starts_with('#') && !known_rules.insert(line.to_owned())
+        {
+            continue;
+        }
+
+        output.push_str(line);
+        output.push('\n');
+    }
+
+    (output.trim_end().to_owned(), known_rules)
 }
 
 fn new_rules<'a>(source: &'a str, known_rules: &mut HashSet<String>) -> Vec<&'a str> {
@@ -175,14 +188,14 @@ mod tests {
         let templates = [
             template(
                 "Astro",
-                "# Created by Toptal\n\n### Astro ###\ndist/\n.astro/\n",
+                "# Created by Toptal\n\n### Astro ###\ndist/\n.astro/\n.env\n",
             ),
-            template("Node", "# dependencies\nnode_modules/\ndist/\n"),
+            template("Node", "# dependencies\nnode_modules/\ndist/\n.env\n"),
         ];
 
         assert_eq!(
             render(&templates),
-            "# Astro\ndist/\n.astro/\n\n# Node\nnode_modules/\n\n"
+            "# Astro\ndist/\n.astro/\n.env\n\n# Node\nnode_modules/\n\n"
         );
     }
 
@@ -191,5 +204,22 @@ mod tests {
         let templates = [template("Example", "# comment\n\\#file\n")];
 
         assert_eq!(render(&templates), "# Example\n\\#file\n\n");
+    }
+
+    #[test]
+    fn merge_removes_rules_already_repeated_in_existing_file() {
+        let templates = [template("Astro", ".env\ndist/\n")];
+
+        assert_eq!(
+            merge("# Existing\n.env\nnode_modules/\n.env\n", &templates),
+            "# Existing\n.env\nnode_modules/\n\n# Astro\ndist/\n"
+        );
+    }
+
+    #[test]
+    fn distinct_gitignore_patterns_are_not_fuzzily_deduplicated() {
+        let templates = [template("Paths", "dist/\n/dist/\n**/dist/\n")];
+
+        assert_eq!(render(&templates), "# Paths\ndist/\n/dist/\n**/dist/\n\n");
     }
 }
