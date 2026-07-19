@@ -28,6 +28,7 @@ RUN bun install --production --frozen-lockfile
 
 # Move build files
 COPY --from=build-runner /tmp/app/dist ./dist
+COPY server.ts .
 
-# Start bot
-CMD [ "bun", "dist/main.ts" ]
+# Serve the static Astro build with Bun
+CMD [ "bun", "server.ts" ]
