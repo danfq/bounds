@@ -1,19 +1,25 @@
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
-import { Slot } from "radix-ui"
-
+import { Slot } from "@radix-ui/react-slot"
+import {
+  followButtonHref,
+  hasHrefHeaders,
+  type HrefHeaderRecord,
+} from "@/components/custom/button-href"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-4xl border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 cursor-pointer items-center justify-center rounded-4xl border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])[width='24'][height='24']]:size-4",
   {
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-primary/80",
+        shiny:
+          "relative isolate overflow-hidden border-white/30 bg-[linear-gradient(180deg,rgba(252,253,255,0.96)_0%,rgba(230,234,239,0.98)_45%,rgba(188,194,202,0.96)_100%)] text-slate-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.96),inset_0_-1px_0_rgba(94,104,116,0.28),0_12px_30px_-18px_rgba(255,255,255,0.4)] before:pointer-events-none before:absolute before:inset-x-[7%] before:top-px before:h-[48%] before:rounded-full before:bg-[linear-gradient(180deg,rgba(255,255,255,0.95),rgba(255,255,255,0.18)_72%,transparent)] before:content-[''] after:pointer-events-none after:absolute after:inset-y-[-30%] after:left-[-55%] after:w-[38%] after:[animation:button-shiny-glint_4200ms_ease-in-out_infinite] after:bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.96),transparent)] after:opacity-70 after:blur-md after:content-[''] hover:border-white/55 hover:shadow-[inset_0_1px_0_rgba(255,255,255,1),inset_0_-1px_0_rgba(94,104,116,0.34),0_18px_38px_-24px_rgba(255,255,255,0.5)] hover:brightness-[1.02] focus-visible:border-white/60 focus-visible:ring-white/25 motion-reduce:after:animate-none dark:border-white/15",
         outline:
           "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:bg-transparent dark:hover:bg-input/30",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
+          "bg-secondary text-secondary-foreground hover:bg-secondary/80 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
         ghost:
           "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
         destructive:
@@ -23,11 +29,12 @@ const buttonVariants = cva(
       size: {
         default:
           "h-9 gap-1.5 px-3 has-data-[icon=inline-end]:pr-2.5 has-data-[icon=inline-start]:pl-2.5",
-        xs: "h-6 gap-1 px-2.5 text-xs has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 [&_svg:not([class*='size-'])]:size-3",
+        xs: "h-6 gap-1 px-2.5 text-xs has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 [&_svg:not([class*='size-'])[width='24'][height='24']]:size-3",
         sm: "h-8 gap-1 px-3 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
         lg: "h-10 gap-1.5 px-4 has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3",
         icon: "size-9",
-        "icon-xs": "size-6 [&_svg:not([class*='size-'])]:size-3",
+        "icon-xs":
+          "size-6 [&_svg:not([class*='size-'])[width='24'][height='24']]:size-3",
         "icon-sm": "size-8",
         "icon-lg": "size-10",
       },
@@ -39,17 +46,92 @@ const buttonVariants = cva(
   }
 )
 
+type IconProp = React.ReactNode | React.ElementType
+export type { HrefHeaderRecord } from "@/components/custom/button-href"
+
+function renderIconProp(icon: IconProp | undefined): React.ReactNode | null {
+  if (icon == null || icon === false) return null
+  if (React.isValidElement(icon)) return icon
+  return React.createElement(icon as React.ElementType)
+}
+
+type ButtonProps = React.ComponentProps<"button"> &
+  VariantProps<typeof buttonVariants> & {
+    asChild?: boolean
+    href?: string
+    hrefHeaders?: HrefHeaderRecord[]
+    autoDownload?: boolean
+    hrefTarget?: "_blank" | "_self"
+    locale?: string
+    leadingIcon?: IconProp
+    trailingIcon?: IconProp
+  }
+
 function Button({
   className,
   variant = "default",
   size = "default",
   asChild = false,
+  href,
+  hrefHeaders,
+  autoDownload = false,
+  hrefTarget = "_self",
+  locale: localeProp,
+  onClick,
+  onAuxClick,
+  type,
+  leadingIcon,
+  trailingIcon,
+  children,
   ...props
-}: React.ComponentProps<"button"> &
-  VariantProps<typeof buttonVariants> & {
-    asChild?: boolean
-  }) {
-  const Comp = asChild ? Slot.Root : "button"
+}: ButtonProps) {
+  // Reserved for the Button API; keep it out of native button attributes.
+  void localeProp
+
+  const leadingRendered = renderIconProp(leadingIcon)
+  const trailingRendered = renderIconProp(trailingIcon)
+
+  if (autoDownload && !href) {
+    console.error("Button: `autoDownload` requires an `href` prop.")
+  }
+
+  if (hasHrefHeaders(hrefHeaders) && !href) {
+    console.error("Button: `hrefHeaders` requires an `href` prop.")
+  }
+
+  const useAsChild =
+    asChild && !href && leadingRendered == null && trailingRendered == null
+  const Comp = useAsChild ? Slot : "button"
+
+  function handleClick(e: React.MouseEvent<HTMLButtonElement>) {
+    onClick?.(e)
+    if (e.defaultPrevented || !href) return
+    const openInNewTab =
+      e.metaKey ||
+      e.ctrlKey ||
+      e.shiftKey ||
+      e.altKey ||
+      hrefTarget === "_blank"
+    void followButtonHref({
+      href,
+      hrefHeaders,
+      autoDownload,
+      hrefTarget,
+      openInNewTab,
+    })
+  }
+
+  function handleAuxClick(e: React.MouseEvent<HTMLButtonElement>) {
+    onAuxClick?.(e)
+    if (e.defaultPrevented || !href || e.button !== 1) return
+    void followButtonHref({
+      href,
+      hrefHeaders,
+      autoDownload,
+      hrefTarget,
+      openInNewTab: true,
+    })
+  }
 
   return (
     <Comp
@@ -57,9 +139,40 @@ function Button({
       data-variant={variant}
       data-size={size}
       className={cn(buttonVariants({ variant, size, className }))}
+      type={type ?? (href ? "button" : undefined)}
+      onClick={href ? handleClick : onClick}
+      onAuxClick={href ? handleAuxClick : onAuxClick}
       {...props}
-    />
+    >
+      {useAsChild ? (
+        children
+      ) : (
+        <>
+          {leadingRendered != null ? (
+            <span
+              aria-hidden
+              className="inline-flex shrink-0"
+              data-icon="inline-start"
+            >
+              {leadingRendered}
+            </span>
+          ) : null}
+          {children}
+          {trailingRendered != null ? (
+            <span
+              aria-hidden
+              className="inline-flex shrink-0"
+              data-icon="inline-end"
+            >
+              {trailingRendered}
+            </span>
+          ) : null}
+        </>
+      )}
+    </Comp>
   )
 }
 
+// `buttonVariants` is a deliberate non-component export for callers that share Button styling.
+// eslint-disable-next-line react-refresh/only-export-components
 export { Button, buttonVariants }
