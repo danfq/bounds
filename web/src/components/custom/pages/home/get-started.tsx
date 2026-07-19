@@ -60,7 +60,11 @@ export const HomeGetStarted = () => {
   }, [packageManager])
 
   return (
-    <Tabs value={packageManager} onValueChange={changePackageManager} className="w-150 items-center gap-4">
+    <Tabs
+      value={packageManager}
+      onValueChange={changePackageManager}
+      className="w-full max-w-[calc(100vw-2rem)] items-center gap-4 sm:w-150"
+    >
       <TabsList>
         <TabsTrigger id="get-started-tab-cargo" value="cargo" aria-controls="get-started-panel">
           Cargo
@@ -89,7 +93,7 @@ export const HomeGetStarted = () => {
               aria-hidden={!active}
               style={!hydrated && !active ? { opacity: 0, visibility: "hidden" } : undefined}
               className={cn(
-                "w-max transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none",
+                "w-max max-w-[calc(100vw-2rem)] transition-[opacity,transform] duration-200 ease-out motion-reduce:transition-none sm:max-w-none",
                 cardSize
                   ? "absolute top-0 left-1/2 -translate-x-1/2"
                   : active
@@ -112,14 +116,18 @@ export const HomeGetStarted = () => {
  */
 const CommandCard = ({ commands }: { commands: string[] }) => {
   return (
-    <Card className="flex w-min flex-row">
-      <CardContent className="text-sm text-muted-foreground">
-        <div className="flex flex-col gap-2 whitespace-nowrap">
+    <Card className="flex w-min max-w-[calc(100vw-2rem)] flex-row [--card-spacing:--spacing(4)] sm:max-w-none sm:[--card-spacing:--spacing(6)]">
+      <CardContent className="min-w-0 text-sm text-muted-foreground">
+        <div className="flex min-w-0 flex-col gap-2">
           {commands.map((command) => {
             return (
-              <div className="flex flex-row items-center gap-2">
-                <CodeBlock key={command} code={command} />
-                <CopyToClipboard toCopy={command} />
+              <div key={command} className="flex min-w-0 flex-row items-center gap-2">
+                <div className="min-w-0 flex-1 overflow-x-auto py-0.5 whitespace-nowrap">
+                  <CodeBlock code={command} />
+                </div>
+                <div className="shrink-0">
+                  <CopyToClipboard toCopy={command} />
+                </div>
               </div>
             )
           })}
