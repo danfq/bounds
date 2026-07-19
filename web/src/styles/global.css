@@ -130,3 +130,29 @@
     @apply font-sans;
   }
 }
+
+.theme-toggle .theme-toggle-icon {
+  display: none;
+}
+
+html:not([data-theme-preference]) .theme-toggle .theme-toggle-icon--next-light {
+  display: block;
+}
+
+html[data-theme-preference="light"]
+  .theme-toggle
+  .theme-toggle-icon--next-dark {
+  display: block;
+}
+
+html[data-theme-preference="dark"]
+  .theme-toggle
+  .theme-toggle-icon--next-system {
+  display: block;
+}
+
+html[data-theme-preference="system"]
+  .theme-toggle
+  .theme-toggle-icon--next-light {
+  display: block;
+}

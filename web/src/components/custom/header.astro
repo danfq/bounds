@@ -1,0 +1,20 @@
+---
+import { Button } from "@/components/ui/button"
+import { ThemeToggle } from "./theme"
+import { SiGithub } from "react-icons/si"
+---
+
+<header
+  class="pointer-events-none fixed inset-x-0 top-0 z-20 flex flex-row items-center justify-between bg-transparent p-6"
+>
+  {/* title */}
+  <h1 class="text-xl tracking-wide">bounds</h1>
+
+  {/* nav */}
+  <div class="pointer-events-auto flex flex-row gap-2">
+    <Button client:load variant="outline" size="icon" href="https://github.com/danfq/bounds" hrefTarget="_blank">
+      <SiGithub />
+    </Button>
+    <ThemeToggle client:load />
+  </div>
+</header>
