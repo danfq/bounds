@@ -2,8 +2,8 @@ class Bounds < Formula
   desc "Add a .gitignore and LICENSE to a repository"
   homepage "https://github.com/danfq/bounds"
   url "https://github.com/danfq/bounds.git",
-      tag:      "v0.3.0",
-      revision: "f254d4f0e29d72ee2207ea3b57208924bb070f2e"
+      tag:      "v0.4.0",
+      revision: "377f29cff9e6478b151b4a5bf72c93be1ec2e882"
   license "AGPL-3.0-only"
   head "https://github.com/danfq/bounds.git", branch: "main"
 
