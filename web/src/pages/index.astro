@@ -3,6 +3,7 @@ import MainLayout from "@/layouts/main.astro"
 import { HomeGetStarted } from "@/components/custom/pages/home/get-started"
 import { InteractiveGridPattern } from "@/components/ui/interactive-grid-pattern"
 import { cn } from "@/lib/utils"
+import { version } from "../../package.json"
 import { CodeBlock } from "@/components/custom/code"
 ---
 
@@ -30,7 +31,9 @@ import { CodeBlock } from "@/components/custom/code"
       </div>
 
       {/* get started */}
-      <div class="pointer-events-auto flex w-full min-w-0 items-center justify-center">
+      <div class="pointer-events-auto flex w-full min-w-0 flex-col items-center justify-center gap-2">
+        {/* current version */}
+        <p class="text-xs text-muted-foreground">v{version}</p>
         <HomeGetStarted client:load />
       </div>
     </div>

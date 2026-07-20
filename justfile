@@ -20,8 +20,13 @@ coverage:
 
 # format and lint
 check:
+    node scripts/sync-version.mjs --check
     cargo fmt --check
     cargo clippy -- -D warnings
+
+# sync the web package version with Cargo.toml
+sync-version:
+    node scripts/sync-version.mjs
 
 # build and immediately run
 run *args:
