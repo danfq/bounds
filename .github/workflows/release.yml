@@ -215,23 +215,23 @@ jobs:
         id: artifact
         shell: bash
         env:
+          BINARY_NAME: bounds
           EXTENSION: ${{ matrix.extension }}
           PLATFORM: ${{ matrix.platform }}
           TARGET: ${{ matrix.target }}
         run: |
-          PACKAGE_NAME="$(sed -nE 's/^name = "([^"]+)"$/\1/p' Cargo.toml | head -n 1)"
-          BINARY="${PACKAGE_NAME}-${PLATFORM}${EXTENSION}"
+          BINARY="${BINARY_NAME}-${PLATFORM}${EXTENSION}"
           mkdir -p dist
-          cp "target/${TARGET}/release/${PACKAGE_NAME}${EXTENSION}" "dist/$BINARY"
+          cp "target/${TARGET}/release/${BINARY_NAME}${EXTENSION}" "dist/$BINARY"
 
           if [[ "$PLATFORM" == windows-* ]]; then
-            ARCHIVE="${PACKAGE_NAME}-${PLATFORM}.zip"
+            ARCHIVE="${BINARY_NAME}-${PLATFORM}.zip"
             (
               cd dist
               7z a "$ARCHIVE" "$BINARY"
             )
           else
-            ARCHIVE="${PACKAGE_NAME}-${PLATFORM}.tar.gz"
+            ARCHIVE="${BINARY_NAME}-${PLATFORM}.tar.gz"
             tar -C dist -czf "dist/$ARCHIVE" "$BINARY"
           fi
 
